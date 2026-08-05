@@ -15507,9 +15507,10 @@ function groupAbout() {
       `${sourceLabel(m)} · ${m.coverage} of 88 counties` +
       (m.suppressed ? ` · ${m.suppressed} withheld cell${m.suppressed === 1 ? '' : 's'}` : '')) : null,
     m && m.hasCV ? h('p', {class: 'hint',
-      text: 'USDA publishes a coefficient of variation for this measure — hover a ' +
-            'county to see it. It is available from the 2012 census onward; the ' +
-            '2002 and 2007 censuses were released without one.'}) : null,
+      text: `USDA publishes a coefficient of variation for this measure in ` +
+            `${(DB.cv[m.id] ? Object.keys(DB.cv[m.id]).sort() : []).join(', ')} — ` +
+            `hover a county to see it. The 2002 and 2007 censuses were released ` +
+            `without one, and not every measure carries it in every later year.`}) : null,
     m && isQuickStats(m) ? h('p', {class: 'hint',
       text: 'Taken from the Quick Stats bulk release rather than the printed ' +
             'tables, so it carries all five censuses and USDA’s own variable name.'}) : null,
