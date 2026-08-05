@@ -17,7 +17,7 @@ by commodity, production expenses, government payments, livestock inventories,
 every crop from corn to Marionberries, machinery, organic acreage, and producer
 demographics.
 
-### 16 views
+### 18 views
 
 | | |
 |---|---|
