@@ -25,9 +25,10 @@ what you want), **Single measure** (the sidebar's measure, drawn a different
 way), and **Compare measures** (two or more things side by side). Views needing
 a second measure dim and show a `+1` until one is picked.
 
-Sidebar sections stay open while you work them — which section is expanded, the
-county list's scroll position and its filter text all survive the re-render that
-every control triggers.
+Every control triggers a full re-render, so the things you have adjusted about
+the page itself are carried across it: which sidebar sections are open, both
+panels' scroll positions, any scrollable list inside the view, and the text and
+caret in a filter box. Switching to a different view still starts you at its top.
 
 | | |
 |---|---|

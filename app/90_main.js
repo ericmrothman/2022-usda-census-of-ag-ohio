@@ -68,6 +68,32 @@ const VIEWS = [
 const PARTS_VIEWS = new Set(['treemap', 'waffle', 'donut']);
 
 let rafToken = null;
+let lastView = null;
+
+/**
+ * Panels inside the canvas that scroll on their own. Ticking a checkbox
+ * halfway down one of these rebuilds the canvas, so their offsets have to be
+ * carried across the same way the page's own scroll is.
+ */
+const SCROLL_KEEP = ['.hist-list', '.scroll-x'];
+
+function captureScroll(root) {
+  const parts = [];
+  for (const sel of SCROLL_KEEP) {
+    root.querySelectorAll(sel).forEach((el, i) => {
+      if (el.scrollTop || el.scrollLeft) parts.push([sel, i, el.scrollTop, el.scrollLeft]);
+    });
+  }
+  return {self: root.scrollTop, parts};
+}
+
+function restoreScroll(root, snap) {
+  root.scrollTop = snap.self;
+  for (const [sel, i, top, left] of snap.parts) {
+    const el = root.querySelectorAll(sel)[i];
+    if (el) { el.scrollTop = top; el.scrollLeft = left; }
+  }
+}
 
 function render() {
   if (rafToken) cancelAnimationFrame(rafToken);
@@ -76,12 +102,19 @@ function render() {
     try {
       paintViewbar();
       buildSidebar($('#sidebar'));
-      const canvas = clear($('#canvas'));
+      const canvas = $('#canvas');
+      // Adjusting a control should leave you looking at what you adjusted;
+      // switching to a different view should start you at the top of it.
+      const sameView = STATE.view === lastView;
+      const snap = sameView ? captureScroll(canvas) : null;
+      clear(canvas);
       const view = VIEWS.find(v => v.id === STATE.view) || VIEWS[0];
+      lastView = view.id;
       if (view.id === 'stories') markSeen('stories');
       if (PARTS_VIEWS.has(view.id)) canvas.append(partsToggle());
       view.fn(canvas);
       canvas.append(sourceFooter());
+      if (snap) restoreScroll(canvas, snap);
     } catch (err) {
       console.error(err);
       clear($('#canvas')).append(h('div', {class: 'card'},
