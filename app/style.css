@@ -285,6 +285,99 @@ input[type="range"] { width: 100%; accent-color: var(--accent); }
 .ramp .bar i { flex: 1; }
 .ramp .nm { font-size: 11px; color: var(--text-secondary); width: 62px; flex: none; }
 
+/* ------------------------------------------------- measure dictionary */
+
+.browse-card { padding: 12px 14px; }
+
+.browse-head {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  background: none; border: 0; cursor: pointer; text-align: left;
+  padding: 2px; border-radius: 7px; color: inherit;
+}
+.browse-head:hover { background: var(--hover); }
+.browse-head .nm { font-size: 13px; min-width: 0; }
+.browse-head .nm strong { font-weight: 620; }
+.browse-head .tw {
+  width: 6px; height: 6px; flex: none; margin: 0 3px;
+  border-right: 1.6px solid var(--text-muted);
+  border-bottom: 1.6px solid var(--text-muted);
+  transform: rotate(-45deg); transition: transform .15s;
+}
+.browse-head[aria-expanded="true"] .tw { transform: rotate(45deg); }
+
+.browse-sec {
+  font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--text-muted); font-weight: 650;
+  margin: 12px 0 5px; padding-top: 8px; border-top: 1px solid var(--border);
+}
+
+.browse-list {
+  display: grid; gap: 2px;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+}
+
+.browse-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 6px; border-radius: 7px; min-width: 0;
+}
+.browse-row:hover { background: var(--hover); }
+.browse-row.on { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+.browse-row .pick {
+  flex: 1; min-width: 0; text-align: left; border: 0; background: none;
+  cursor: pointer; padding: 2px 0; color: inherit;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.browse-row .pick .lab { font-size: 12.5px; line-height: 1.35; }
+.browse-row.on .pick .lab { font-weight: 640; color: var(--accent); }
+.browse-row .pick .meta {
+  display: flex; gap: 5px; font-size: 10.5px; color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.browse-row .cov {
+  width: 34px; height: 4px; flex: none; border-radius: 2px;
+  background: var(--grid); overflow: hidden;
+}
+.browse-row .cov i { display: block; height: 100%; background: var(--axis); }
+
+/* The compare chip is a second action on a list of hundreds — it stays out of
+   the way until the row is under the cursor, or until it is actually in use. */
+.browse-row .cmp {
+  flex: none; font-size: 10.5px; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--border-strong); background: var(--surface-1);
+  color: var(--text-muted); cursor: pointer;
+  opacity: 0; transition: opacity .12s;
+}
+.browse-row:hover .cmp,
+.browse-row:focus-within .cmp,
+.browse-row .cmp.on { opacity: 1; }
+.browse-row .cmp:hover { color: var(--text-primary); background: var(--hover); }
+.browse-row .cmp.on {
+  background: var(--accent); border-color: var(--accent);
+  color: var(--accent-ink); font-weight: 600;
+}
+
+/* ------------------------------------------- nudge toward Key findings */
+
+/*
+ * A dot beside the first tab until it has been opened once. It stops for good
+ * after that (remembered in localStorage), and holds still for anyone who has
+ * asked for reduced motion.
+ */
+.viewbar button .nudge {
+  display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent); margin-left: 6px; vertical-align: 1px;
+  animation: nudge-pulse 2.6s ease-in-out infinite;
+}
+@keyframes nudge-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+  50%      { opacity: .75; box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .viewbar button .nudge { animation: none; }
+}
+
 /* ------------------------------------------------------------------ chart */
 
 .axis-line { stroke: var(--axis); stroke-width: 1; }

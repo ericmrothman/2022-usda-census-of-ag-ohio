@@ -35,6 +35,7 @@ function saveState() {
   try {
     localStorage.setItem(LS_KEY, JSON.stringify({
       collections: STATE.collections,
+      seen: SEEN,
       theme: document.documentElement.dataset.theme,
     }));
   } catch (e) { /* private mode; not worth surfacing */ }
@@ -44,6 +45,7 @@ function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
     if (s.collections) STATE.collections = s.collections;
+    if (s.seen) Object.assign(SEEN, s.seen);
     if (s.theme) document.documentElement.dataset.theme = s.theme;
   } catch (e) { /* ignore */ }
 }

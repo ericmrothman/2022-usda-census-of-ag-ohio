@@ -72,15 +72,22 @@ def tidy(text):
 
 
 def dedupe_parts(parts):
-    """Drop repeats and parts already contained in a neighbour."""
-    out = []
+    """
+    Drop exact repeats only.
+
+    Substring matching is tempting here and wrong: in "All Goats - Inventory
+    and Sales > Inventory > Farms" both "Inventory" and "Sales" appear inside
+    the table's own title, so dropping contained parts collapsed the inventory
+    and the sales columns onto one indistinguishable label.
+    """
+    out, seen = [], set()
     for p in parts:
         if not p:
             continue
         low = p.lower()
-        if any(low == q.lower() or low in q.lower() for q in out):
+        if low in seen:
             continue
-        out = [q for q in out if q.lower() not in low]
+        seen.add(low)
         out.append(p)
     return out
 
@@ -98,8 +105,12 @@ def short_label(section, metric, unit):
     tail = parts[-2:] if parts else []
     label = " · ".join(dedupe_parts(tail + metric.split(" · ")))
     label = re.sub(r"\s+", " ", label).strip()
-    if unit and f"({unit})".lower() not in label.lower() \
-            and unit.lower() not in label.lower():
+    # Append the unit unless the label already ends with it. Testing for the
+    # unit anywhere in the label is too eager: "Farms by number sold" contains
+    # both "farms" and "number", which would leave the farms and the head-count
+    # versions of the same breakdown sharing one name.
+    low = label.lower()
+    if unit and f"({unit})".lower() not in low and not low.endswith(unit.lower()):
         label = f"{label} ({unit})"
     return label
 

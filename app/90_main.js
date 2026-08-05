@@ -4,6 +4,7 @@
 
 const VIEWS = [
   {id: 'stories',   label: 'Key findings',  fn: viewStories},
+  {id: 'browse',    label: 'All measures',   fn: viewBrowse},
   {id: 'map',       label: 'Map',            fn: viewMap},
   {id: 'grid',      label: 'Tile grid',      fn: viewGrid},
   {id: 'bivariate', label: 'Two at once',    fn: viewBivariate},
@@ -36,6 +37,7 @@ function render() {
       buildSidebar($('#sidebar'));
       const canvas = clear($('#canvas'));
       const view = VIEWS.find(v => v.id === STATE.view) || VIEWS[0];
+      if (view.id === 'stories') markSeen('stories');
       if (PARTS_VIEWS.has(view.id)) canvas.append(partsToggle());
       view.fn(canvas);
       canvas.append(sourceFooter());
@@ -67,11 +69,31 @@ function sourceFooter() {
 function paintViewbar() {
   const bar = clear($('#viewbar'));
   for (const v of VIEWS) {
-    bar.append(h('button', {
+    const btn = h('button', {
       role: 'tab', 'aria-selected': String(v.id === STATE.view), text: v.label,
-      onclick: () => { STATE.view = v.id; render(); },
-    }));
+      onclick: () => {
+        if (v.id === 'stories') markSeen('stories');
+        STATE.view = v.id;
+        render();
+      },
+    });
+    // Key findings is the best way in but the least obvious tab, so it gets a
+    // dot until it has been opened once.
+    if (v.id === 'stories' && !SEEN.stories && STATE.view !== 'stories') {
+      btn.append(h('span', {class: 'nudge', 'aria-hidden': 'true'}));
+      btn.setAttribute('title', 'Start here — ready-made findings for any county');
+    }
+    bar.append(btn);
   }
+}
+
+/** Which one-time hints the reader has already dismissed by using them. */
+const SEEN = {};
+
+function markSeen(key) {
+  if (SEEN[key]) return;
+  SEEN[key] = true;
+  saveState();
 }
 
 /** Part-to-whole charts can split by county or by sibling measure. */
@@ -90,7 +112,8 @@ function partsToggle() {
 
 const HASH_KEYS = ['view', 'metric', 'metric2', 'year', 'mode', 'delta', 'deltaPct',
   'ramp', 'diverging', 'divKey', 'reverse', 'nClasses', 'breakMode', 'exclude',
-  'showLabels', 'sortBy', 'topN', 'partsBy', 'focus', 'storyCounty'];
+  'showLabels', 'sortBy', 'topN', 'partsBy', 'focus', 'storyCounty',
+  'browseTopic', 'browseQuery'];
 
 function writeHash() {
   const o = {};

@@ -8,7 +8,7 @@ from playwright.sync_api import sync_playwright
 HTML = os.path.abspath("ohio_ag_explorer.html")
 SHOTS = "build/shots"
 
-VIEWS = ["stories", "map", "grid", "bivariate", "rank", "change", "small", "treemap",
+VIEWS = ["stories", "browse", "map", "grid", "bivariate", "rank", "change", "small", "treemap",
          "waffle", "donut", "dist", "scatter", "heatmap", "conc", "history",
          "discover", "table"]
 

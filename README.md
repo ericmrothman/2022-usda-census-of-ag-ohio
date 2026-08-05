@@ -22,6 +22,7 @@ demographics.
 | | |
 |---|---|
 | **Key findings** | One-click presets that open the explorer on a specific finding |
+| **All measures** | The measure dictionary — browse all 2,325 by topic and table |
 | **Map** | Choropleth on an equal-area projection |
 | **Tile grid** | Every county one equal tile — so Cuyahoga doesn't vanish next to Darke |
 | **Two at once** | Bivariate choropleth: two measures, one map, 3×3 key |
@@ -39,7 +40,8 @@ demographics.
 
 ### Controls
 
-- **Measure picker** — search 2,325 measures by crop, animal, dollar figure or table
+- **Measure picker** — search 2,325 measures by crop, animal, dollar figure or table,
+  or open the **All measures** dictionary and browse them instead (see below)
 - **Year** — 2017 / 2022, or the change between them (absolute or %)
 - **How to count it** — raw · % of Ohio · per farm · per farm acre · per 1,000 acres
   of land · z-score · rank · **location quotient** (specialisation)
@@ -53,6 +55,21 @@ demographics.
 - **Export** — SVG, 2× PNG, or the CSV behind the current view
 - `[` and `]` step through views; the URL hash captures the full state, so any
   view you land on is a link you can paste to someone.
+
+### The measure dictionary
+
+Search only works once you know what to ask for. The **All measures** tab is the
+other way in: the whole report laid out as the census organises it — topic → one
+of the 57 county tables → section → measure — with everything collapsed until you
+open it. Each entry shows the years it covers, how many of the 88 counties report
+it, and how many cells were withheld; clicking selects it and jumps to the map,
+and the **vs** chip on hover puts it in the comparison slot. There is a **Surprise
+me** button for when you want the census to pick.
+
+Filtering the dictionary auto-expands whatever matches, so `goat` opens the five
+goat tables at once. When nothing matches it says so, and points out that the
+census uses its own vocabulary — "hogs" not "pigs", "equine" not "horses",
+"floriculture" not "flowers".
 
 ### Key findings (presets)
 

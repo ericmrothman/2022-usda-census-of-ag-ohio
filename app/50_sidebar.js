@@ -39,9 +39,14 @@ function groupMeasure() {
   return group('Measure', true,
     metricPicker('metric', 'Primary measure'),
     metricPicker('metric2', 'Compare with (optional)', true),
+    h('button', {class: 'btn', style: {width: '100%'},
+      text: 'Browse all measures →',
+      title: 'The full dictionary, laid out the way the census organises it',
+      onclick: () => { STATE.view = 'browse'; render(); }}),
     h('p', {class: 'hint',
       text: `${DB.metrics.length.toLocaleString()} measures, parsed from the 57 ` +
-            `county tables of the report. Search by crop, animal, dollar figure or table name.`}));
+            `county tables of the report. Search above if you know what you want; ` +
+            `browse if you don't.`}));
 }
 
 function metricPicker(key, label, clearable) {
