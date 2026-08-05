@@ -1,0 +1,18 @@
+# Parsed CSVs and the packed payload — both regenerate from ohv1.txt by
+# running the three build scripts, so there is no reason to version 56 MB
+# of derived data.
+data/
+build/payload.json
+build/payload.json.gz
+
+# Test output
+build/shots/
+build/dl/
+
+# build/counties-10m.json IS committed: it is a one-off download from
+# jsDelivr, and vendoring it keeps the build working offline.
+
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
