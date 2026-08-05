@@ -2,7 +2,20 @@
    The control panel. One filter surface for every view — nothing chart-local.
    ========================================================================== */
 
+/**
+ * Every control re-renders the whole app, which rebuilds this panel from
+ * scratch. Anything the reader has adjusted about the panel itself — which
+ * sections are open, how far the county list is scrolled, what is typed in its
+ * filter — therefore has to live in STATE and be restored, or picking a colour
+ * ramp would snap the Colour section shut under your cursor.
+ */
 function buildSidebar(aside) {
+  const scroll = aside.scrollTop;
+  const listScroll = (aside.querySelector('.county-list') || {}).scrollTop || 0;
+  const activeId = document.activeElement && document.activeElement.dataset
+    ? document.activeElement.dataset.keep : null;
+  const caret = activeId && document.activeElement.selectionStart;
+
   clear(aside);
   aside.append(
     groupMeasure(),
@@ -13,12 +26,27 @@ function buildSidebar(aside) {
     groupDisplay(),
     groupAbout(),
   );
+
+  aside.scrollTop = scroll;
+  const list = aside.querySelector('.county-list');
+  if (list) list.scrollTop = listScroll;
+  if (activeId) {
+    const el = aside.querySelector(`[data-keep="${activeId}"]`);
+    if (el) {
+      el.focus();
+      if (caret != null && el.setSelectionRange) el.setSelectionRange(caret, caret);
+    }
+  }
 }
 
-function group(title, open, ...body) {
-  const d = h('details', {class: 'group'}, h('summary', {text: title}),
+function group(title, defaultOpen, ...body) {
+  STATE.groupOpen = STATE.groupOpen || {};
+  const open = STATE.groupOpen[title] ?? defaultOpen;
+  const d = h('details', {class: 'group'},
+    h('summary', {text: title}),
     h('div', {class: 'body'}, ...body));
   if (open) d.setAttribute('open', '');
+  d.addEventListener('toggle', () => { STATE.groupOpen[title] = d.open; });
   return d;
 }
 
@@ -179,13 +207,15 @@ function groupCounties() {
   const sel = STATE.selected;
   const n = activeCounties().length;
 
-  const search = h('input', {type: 'search', placeholder: 'Filter the list…'});
+  const search = h('input', {type: 'search', placeholder: 'Filter the list…',
+    'data-keep': 'countySearch', value: STATE.countyQuery || '',
+    oninput: e => { STATE.countyQuery = e.target.value; paint(); }});
   const list = h('div', {class: 'county-list'});
   const ser = STATE.metric ? series(STATE.metric, STATE.year, STATE.mode) : null;
 
   const paint = () => {
     clear(list);
-    const q = search.value.toLowerCase();
+    const q = (STATE.countyQuery || '').toLowerCase();
     DB.counties.forEach((cty, i) => {
       if (q && !cty.name.toLowerCase().includes(q)) return;
       const on = !sel || sel.size === 0 ? !STATE.exclude : sel.has(cty.name);
@@ -198,7 +228,6 @@ function groupCounties() {
     });
   };
   paint();
-  search.addEventListener('input', paint);
 
   const presetChips = h('div', {class: 'chips'});
   const presets = {

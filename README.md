@@ -21,9 +21,13 @@ demographics.
 
 The tab bar is split into three labelled rows, because eighteen tabs in one
 strip all read as equally likely: **Start here** (where to go before you know
-what you want), **One measure** (the sidebar's measure, drawn a different way),
-and **Compare** (two or more things side by side). Views needing a second
-measure dim and show a `+1` until one is picked.
+what you want), **Single measure** (the sidebar's measure, drawn a different
+way), and **Compare measures** (two or more things side by side). Views needing
+a second measure dim and show a `+1` until one is picked.
+
+Sidebar sections stay open while you work them — which section is expanded, the
+county list's scroll position and its filter text all survive the re-render that
+every control triggers.
 
 | | |
 |---|---|

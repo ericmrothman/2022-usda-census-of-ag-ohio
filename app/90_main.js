@@ -15,9 +15,9 @@
 const VIEW_GROUPS = [
   {id: 'start',   label: 'Start here',
    hint: 'Ready-made findings, and the full list of what the census measures'},
-  {id: 'single',  label: 'One measure',
+  {id: 'single',  label: 'Single measure',
    hint: 'The measure selected in the sidebar, drawn a different way'},
-  {id: 'compare', label: 'Compare',
+  {id: 'compare', label: 'Compare measures',
    hint: 'Two or more measures, or one measure against everything else'},
 ];
 

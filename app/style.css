@@ -135,7 +135,7 @@ main {
 .viewrow + .viewrow { border-top: 1px solid var(--border); }
 
 .viewrow .rowlab {
-  width: 92px; flex: none; cursor: help;
+  width: 132px; flex: none; cursor: help;
   font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
   font-weight: 680; color: var(--text-muted);
 }
