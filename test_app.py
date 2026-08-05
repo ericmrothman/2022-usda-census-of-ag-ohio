@@ -9,7 +9,7 @@ HTML = os.path.abspath("ohio_ag_explorer.html")
 SHOTS = "build/shots"
 
 VIEWS = ["stories", "browse", "map", "grid", "bivariate", "rank", "change", "small", "treemap",
-         "waffle", "donut", "dist", "scatter", "heatmap", "conc", "history",
+         "waffle", "donut", "dist", "scatter", "heatmap", "conc", "trend", "history",
          "discover", "table"]
 
 
@@ -49,6 +49,14 @@ def main():
 
         for v in VIEWS:
             errors.clear()
+            # The trend view needs a measure that spans more than two censuses;
+            # only the Quick Stats series do.
+            if v == "trend":
+                page.evaluate('''() => {
+                    const m = DB.metrics.find(x => x.source === 'quickstats'
+                                              && x.coverage === 88);
+                    if (m) { STATE.metric = m.id; STATE.year = '2022'; }
+                }''')
             page.evaluate(f"() => {{ STATE.view = '{v}'; render(); }}")
             page.wait_for_timeout(700)
             marks = page.evaluate("""() => {
@@ -71,6 +79,12 @@ def main():
                 problems.append(f"{v}: {errors[:3]}")
             print(f"  {v:11s} {status:7s} svg={marks['svgs']} marks={marks['shapes']:5d} "
                   f"rows={marks['rows']:3d}  {marks['text'][:44]}")
+
+        page.evaluate('''() => {
+            const m = DB.metrics.find(x => x.label === 'Total sales ($1,000)'
+                                      && x.years.length > 1);
+            if (m) { STATE.metric = m.id; STATE.year = '2022'; }
+        }''')
 
         # Exercise the controls that change how values are computed.
         print("\nnormalisation modes:")

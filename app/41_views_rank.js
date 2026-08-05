@@ -90,8 +90,9 @@ function viewRank(root) {
 
 function viewChange(root) {
   const m = DB.metricById.get(STATE.metric);
-  if (!m || m.years.length < 2) return root.append(noDeltaNotice());
-  const from = m.years[0], to = m.years[m.years.length - 1];
+  const pair = deltaYears(STATE.metric);
+  if (!m || !pair) return root.append(noDeltaNotice());
+  const [from, to] = pair;
   const a = series(STATE.metric, from, STATE.mode);
   const b = series(STATE.metric, to, STATE.mode);
 

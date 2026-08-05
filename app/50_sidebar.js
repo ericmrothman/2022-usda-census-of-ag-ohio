@@ -72,9 +72,9 @@ function groupMeasure() {
       title: 'The full dictionary, laid out the way the census organises it',
       onclick: () => { STATE.view = 'browse'; render(); }}),
     h('p', {class: 'hint',
-      text: `${DB.metrics.length.toLocaleString()} measures, parsed from the 57 ` +
-            `county tables of the report. Search above if you know what you want; ` +
-            `browse if you don't.`}));
+      text: `${DB.metrics.length.toLocaleString()} measures from the printed county ` +
+            `tables and USDA's Quick Stats release. Search above if you know what ` +
+            `you want; browse if you don't.`}));
 }
 
 function metricPicker(key, label, clearable) {
@@ -169,22 +169,50 @@ function groupTime() {
   const years = m ? m.years : ['2022'];
   const body = [
     h('label', {class: 'field'}, h('span', {text: 'Census year'}),
-      segmented(years.map(y => ({id: y, label: y})), STATE.year, y => {
-        STATE.year = y; STATE.delta = false; render();
-      })),
+      segmented(years.map(y => ({id: y, label: y})), bestYear(STATE.metric, STATE.year),
+        y => { STATE.year = y; STATE.delta = false; render(); })),
   ];
+
   if (years.length > 1) {
+    const pair = deltaYears(STATE.metric) || [years[0], years[years.length - 1]];
     body.push(h('div', {class: 'row'},
       h('button', {class: `btn${STATE.delta ? ' primary' : ''}`,
-        text: `Change ${years[0]} → ${years[years.length - 1]}`,
+        text: `Change ${pair[0]} → ${pair[1]}`,
         onclick: () => { STATE.delta = !STATE.delta; render(); }}),
       STATE.delta ? segmented(
         [{id: 'pct', label: '%'}, {id: 'abs', label: 'absolute'}],
         STATE.deltaPct ? 'pct' : 'abs',
         v => { STATE.deltaPct = v === 'pct'; render(); }) : null));
+
+    // With five censuses "the change" stops being obvious, so name the pair.
+    if (STATE.delta && years.length > 2) {
+      const pick = (which, current) => {
+        const sel = h('select', {onchange: e => {
+          STATE[which] = e.target.value; render();
+        }});
+        for (const y of years)
+          sel.append(h('option', {value: y, selected: y === current, text: y}));
+        return sel;
+      };
+      body.push(h('label', {class: 'field'}, h('span', {text: 'Between which censuses'}),
+        h('div', {class: 'row'},
+          pick('yearFrom', pair[0]),
+          h('span', {class: 'hint', text: '→'}),
+          pick('yearTo', pair[1]),
+          h('button', {class: 'btn sm', text: 'Full span', onclick: () => {
+            STATE.yearFrom = null; STATE.yearTo = null; render();
+          }}))));
+    }
   } else {
     body.push(h('p', {class: 'hint',
-      text: 'The census only published this measure once, so there is no change to draw.'}));
+      text: 'The census published this measure once, so there is no change to draw. ' +
+            'Measures from Quick Stats carry all five censuses, 2002 to 2022.'}));
+  }
+
+  if (m) {
+    body.push(h('p', {class: 'hint',
+      text: `${sourceLabel(m)} · ${years.length} census ` +
+            `${years.length === 1 ? 'year' : 'years'}: ${years.join(', ')}`}));
   }
   return group('Time', true, ...body.filter(Boolean));
 }
@@ -366,10 +394,17 @@ function groupAbout() {
   return group('About this figure', false,
     m ? h('p', {class: 'hint'},
       h('strong', {text: m.label}), h('br'),
-      `${m.context}`, h('br'),
-      `${m.table}, county chapter · reported for ${m.years.join(' and ')} · ` +
-      `${m.coverage} of 88 counties` +
+      m.official ? h('span', {style: {fontFamily: 'var(--mono)', fontSize: '10.5px'},
+        text: m.official}) : `${m.context}`, h('br'),
+      `${sourceLabel(m)} · ${m.coverage} of 88 counties` +
       (m.suppressed ? ` · ${m.suppressed} withheld cell${m.suppressed === 1 ? '' : 's'}` : '')) : null,
+    m && m.hasCV ? h('p', {class: 'hint',
+      text: 'USDA publishes a coefficient of variation for this measure — hover a ' +
+            'county to see it. It is available from the 2012 census onward; the ' +
+            '2002 and 2007 censuses were released without one.'}) : null,
+    m && isQuickStats(m) ? h('p', {class: 'hint',
+      text: 'Taken from the Quick Stats bulk release rather than the printed ' +
+            'tables, so it carries all five censuses and USDA’s own variable name.'}) : null,
     h('p', {class: 'hint', text: DB.source}),
     h('p', {class: 'hint',
       text: 'Codes in the source: (D) withheld to avoid disclosing an individual ' +

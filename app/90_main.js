@@ -58,6 +58,8 @@ const VIEWS = [
    tip: 'One mini-map per measure in the same breakdown group'},
   {g: 'compare', id: 'heatmap', label: 'Heatmap', fn: viewHeatmap,
    tip: 'Every county against every measure in the group, standardised'},
+  {g: 'compare', id: 'trend', label: 'County trends', fn: viewTrend,
+   tip: 'One measure per county across all five censuses, 2002–2022'},
   {g: 'compare', id: 'history', label: 'Ohio over time', fn: viewHistory,
    tip: 'Several statewide series, 1997–2022, indexed to a common base'},
   {g: 'compare', id: 'discover', label: 'Discover', fn: viewDiscover,
@@ -199,7 +201,8 @@ function partsToggle() {
 const HASH_KEYS = ['view', 'metric', 'metric2', 'year', 'mode', 'delta', 'deltaPct',
   'ramp', 'diverging', 'divKey', 'reverse', 'nClasses', 'breakMode', 'exclude',
   'showLabels', 'sortBy', 'topN', 'partsBy', 'focus', 'storyCounty',
-  'browseTopic', 'browseQuery', 'historyQuery'];
+  'browseTopic', 'browseQuery', 'historyQuery', 'yearFrom', 'yearTo',
+  'browseSource', 'trendMode'];
 
 function writeHash() {
   const o = {};

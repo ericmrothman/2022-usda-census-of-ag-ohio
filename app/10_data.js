@@ -11,6 +11,7 @@ const DB = {
   values: {},        // id -> {year: [v x 88]}
   ohio: {},          // id -> {year: v}
   history: [],
+  cv: {},            // Quick Stats coefficient of variation, 2012 onward
   geo: null,
   grid: {cols: 12, rows: 12},
   presets: {},
@@ -53,6 +54,38 @@ function rawSeries(metricId, year) {
 function ohioValue(metricId, year) {
   const o = DB.ohio[metricId];
   return o && o[year] != null ? o[year] : null;
+}
+
+/**
+ * USDA's coefficient of variation for a figure, as a percentage.
+ *
+ * Published only for the Quick Stats series, and only from 2012 — the 2002 and
+ * 2007 censuses carry none. A high CV means the estimate is uncertain, which no
+ * amount of chart polish can fix, so it belongs in the tooltip next to the
+ * number it qualifies.
+ */
+function cvFor(metricId, year, countyIndex) {
+  const c = DB.cv[metricId];
+  if (!c || !c[year]) return null;
+  const v = c[year][countyIndex];
+  return v == null ? null : v;
+}
+
+function cvNote(cv) {
+  if (cv == null) return '';
+  if (cv < 15) return 'reliable';
+  if (cv < 30) return 'moderate uncertainty';
+  return 'high uncertainty';
+}
+
+const isQuickStats = m => (m && m.source) === 'quickstats';
+
+/** Where a figure came from, for provenance lines. */
+function sourceLabel(m) {
+  if (!m) return '';
+  return isQuickStats(m)
+    ? `USDA Quick Stats · ${m.years[0]}–${m.years[m.years.length - 1]}`
+    : `${m.table}, county chapter`;
 }
 
 /** Years a metric actually carries, newest last. */
@@ -214,11 +247,27 @@ function series(metricId, year, mode) {
   return {values: out, unit, label: m.label, context: m.context, mode, year: y, note, metric: m};
 }
 
-/** 2017 → 2022 change for a metric, in absolute or percentage terms. */
-function changeSeries(metricId, mode, pct) {
+/**
+ * Which two censuses a change is measured between.
+ *
+ * The report only carries 2017 and 2022, so this used to be implicit. Quick
+ * Stats series run 2002–2022, where "the change" is a question rather than a
+ * given — hence an explicit pair, falling back to first→last.
+ */
+function deltaYears(metricId) {
   const ys = metricYears(metricId);
   if (ys.length < 2) return null;
-  const from = ys[0], to = ys[ys.length - 1];
+  const from = ys.includes(STATE.yearFrom) ? STATE.yearFrom : ys[0];
+  let to = ys.includes(STATE.yearTo) ? STATE.yearTo : ys[ys.length - 1];
+  if (to === from) to = ys[ys.length - 1] === from ? ys[0] : ys[ys.length - 1];
+  return from < to ? [from, to] : [to, from];
+}
+
+/** Change in a metric between two censuses, absolute or as a percentage. */
+function changeSeries(metricId, mode, pct) {
+  const pair = deltaYears(metricId);
+  if (!pair) return null;
+  const [from, to] = pair;
   const a = series(metricId, from, mode).values;
   const b = series(metricId, to, mode).values;
   const out = new Array(a.length).fill(null);

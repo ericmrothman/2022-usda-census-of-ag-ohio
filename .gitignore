@@ -1,9 +1,19 @@
 # Parsed CSVs and the packed payload — both regenerate from ohv1.txt by
 # running the three build scripts, so there is no reason to version 56 MB
 # of derived data.
-data/
+#
+# Note this excludes the directory's *contents*, not the directory: git cannot
+# re-include a file whose parent directory is itself excluded, and the Quick
+# Stats cache below has to survive.
+data/*
 build/payload.json
 build/payload.json.gz
+
+# The Quick Stats cache is committed for the same reason ohv1.txt is: without
+# it a fresh clone must pull 1.5 GB from NASS before it can build anything.
+# 8 MB, already gzipped, and it is what validate_quickstats.py checks the
+# parser against.
+!data/qs_ohio_county.tsv.gz
 
 # Test output
 build/shots/

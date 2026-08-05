@@ -18,16 +18,39 @@ const TOPIC_BLURB = {
   Producers:  'Who farms — age, sex, race and ethnicity, military service, years on the operation, and off-farm work.',
 };
 
-/** Everything grouped the way the report is: topic → table → section. */
-function browseTree() {
+/**
+ * Everything grouped the way its source organises it: topic → table → section
+ * for the printed report, topic → commodity group → commodity for Quick Stats.
+ *
+ * The two sources genuinely are shelved differently — the report by the table
+ * it was printed in, Quick Stats by what the thing is — so forcing one tree on
+ * both would misrepresent whichever lost.
+ */
+function browseTree(sourceFilter) {
   const topics = new Map();
   for (const m of DB.metrics) {
+    const src = m.source || 'report';
+    if (sourceFilter && src !== sourceFilter) continue;
     if (!topics.has(m.topic)) topics.set(m.topic, new Map());
     const tables = topics.get(m.topic);
-    const key = `${m.table} — ${m.context}`;
-    if (!tables.has(key)) tables.set(key, {table: m.table, title: m.context, sections: new Map()});
+
+    let key, table, title, sec;
+    if (src === 'quickstats') {
+      const tree = m.tree || [];
+      table = 'Quick Stats';
+      title = tree[1] || tree[0] || 'Quick Stats';
+      key = `qs:${title}`;
+      sec = tree.slice(2).join(' › ');
+    } else {
+      table = m.table;
+      title = m.context;
+      key = `${m.table} — ${m.context}`;
+      sec = m.section ? tidySection(m.section) : '';
+    }
+
+    if (!tables.has(key))
+      tables.set(key, {table, title, source: src, sections: new Map()});
     const t = tables.get(key);
-    const sec = m.section ? tidySection(m.section) : '';
     if (!t.sections.has(sec)) t.sections.set(sec, []);
     t.sections.get(sec).push(m);
   }
@@ -53,7 +76,7 @@ function matchesQuery(m, terms) {
 function viewBrowse(root) {
   const q = (STATE.browseQuery || '').trim().toLowerCase();
   const terms = q.split(/\s+/).filter(Boolean);
-  const tree = browseTree();
+  const tree = browseTree(STATE.browseSource || null);
 
   /* ---- header: what this is, plus search and a way in for the undecided --- */
 
@@ -74,11 +97,20 @@ function viewBrowse(root) {
   const head = h('div', {class: 'card'},
     h('h2', {text: 'Measure dictionary'}),
     h('p', {class: 'caption'},
-      `Every one of the ${DB.metrics.length.toLocaleString()} measures in this report, ` +
-      `laid out the way the census organises them — 57 county tables, each broken into ` +
-      `sections. Open a table to see what is in it. Clicking a measure selects it and ` +
-      `takes you to the map.`),
+      `${DB.metrics.length.toLocaleString()} measures from two sources: the printed ` +
+      `county tables (2017 and 2022, shelved by the table they appear in) and USDA's ` +
+      `Quick Stats release (2002–2022, shelved by commodity). Open a group to see what ` +
+      `is in it; clicking a measure selects it and takes you to the map.`),
     h('div', {class: 'row'}, search,
+      segmented([
+        {id: '', label: 'Both sources'},
+        {id: 'report', label: 'Printed report · 2017 & 2022',
+         desc: 'Parsed from the county tables, in the order they are printed — ' +
+               'the structure that matches the published PDFs.'},
+        {id: 'quickstats', label: 'Quick Stats · 2002–2022',
+         desc: "USDA's machine-readable release: official variable names, all " +
+               'five censuses, and a published reliability figure.'},
+      ], STATE.browseSource || '', v => { STATE.browseSource = v || null; render(); }),
       h('button', {class: 'btn', text: 'Surprise me', title:
         'Jump to a randomly chosen measure with good county coverage',
         onclick: () => {
@@ -150,9 +182,11 @@ function viewBrowse(root) {
       },
         h('span', {class: 'tw'}),
         h('span', {class: 'nm'}, h('strong', {text: t.title}),
-          h('span', {class: 'hint', text: `  ${t.table} · county chapter`})),
+          h('span', {class: 'hint', text: t.source === 'quickstats'
+            ? '  USDA Quick Stats' : `  ${t.table} · county chapter`})),
         h('span', {class: 'hint', style: {marginLeft: 'auto', whiteSpace: 'nowrap'},
-          text: `${t.count} measure${t.count === 1 ? '' : 's'} · ${yrs.join(' & ')}`}));
+          text: `${t.count} measure${t.count === 1 ? '' : 's'} · ` +
+                (yrs.length > 2 ? `${yrs[0]}–${yrs[yrs.length - 1]}` : yrs.join(' & '))}));
 
       const card = h('div', {class: 'card browse-card'}, header);
 
@@ -195,7 +229,12 @@ function measureRow(m) {
     onclick: () => pickMeasure(m.id)},
     h('span', {class: 'lab', text: m.label}),
     h('span', {class: 'meta'},
-      h('span', {text: m.years.join(' & ')}),
+      h('span', {text: m.years.length > 2
+        ? `${m.years[0]}–${m.years[m.years.length - 1]}` : m.years.join(' & ')}),
+      m.hasCV ? h('span', {text: '·'}) : null,
+      m.hasCV ? h('span', {title:
+        'USDA publishes a coefficient of variation for this measure, so the ' +
+        'tooltip can say how reliable each county figure is', text: 'CV'}) : null,
       h('span', {text: '·'}),
       h('span', {title: `${m.coverage} of ${DB.counties.length} counties report a figure`,
         text: `${m.coverage}/${DB.counties.length} counties`}),

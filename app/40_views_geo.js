@@ -114,10 +114,12 @@ function viewMap(root) {
       opacity: inScope ? 1 : 0.14,
       style: {cursor: 'pointer'},
     });
+    const cv = ser.isDelta ? null : cvFor(STATE.metric, ser.year, i);
     hoverable(shape, () => tipHTML(name, [
       [ser.label, fmtFull(v, ser.unit)],
       ...(v != null && !ser.isDelta && STATE.mode !== 'raw'
         ? [['Raw', fmtFull(rawSeries(STATE.metric, ser.year)[i], ser.metric.unit)]] : []),
+      ...(cv != null ? [['USDA reliability', `CV ${cv}% — ${cvNote(cv)}`]] : []),
     ], v == null ? 'No figure published for this county.' : ''));
     shape.addEventListener('click', () => spotlight(name));
     g.append(shape);

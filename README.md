@@ -11,13 +11,31 @@ server, no network, no install. It works from a USB stick.
 
 ## What's in it
 
-**2,325 measures × 88 counties**, plus Ohio totals and a 1997–2022 state series.
+**3,137 measures × 88 counties**, from two sources, plus a 1997–2022 state series.
 Everything the report publishes at county level: farm counts and acreage, sales
 by commodity, production expenses, government payments, livestock inventories,
 every crop from corn to Marionberries, machinery, organic acreage, and producer
 demographics.
 
-### 18 views, in three shelves
+### Two data sources
+
+| | |
+|---|---|
+| **Printed report** | 2,325 measures parsed from `ohv1.txt`, the Ohio county volume — 2017 and 2022, shelved by the table they appear in, so it lines up with the published PDFs |
+| **Quick Stats** | 812 measures from USDA's machine-readable bulk release — **all five censuses, 2002–2022**, official variable names, and USDA's own `CV_%` reliability figure |
+
+They sit side by side rather than merged: matching 2,325 reconstructed labels
+against 1,470 official ones would be the likeliest place to introduce a silent
+error. Every measure says which source it came from, and the dictionary filters
+by it.
+
+**The parser is validated against Quick Stats.** `validate_quickstats.py` maps 17
+headline measures to their official `SHORT_DESC` equivalents and compares every
+county value: **1,567 figures, 100% agreement, zero differences.** It exits
+non-zero on any mismatch, so a parser regression fails the build rather than
+quietly shipping.
+
+### 19 views, in three shelves
 
 The tab bar is split into three labelled rows, because eighteen tabs in one
 strip all read as equally likely: **Start here** (where to go before you know
@@ -45,6 +63,7 @@ caret in a filter box. Switching to a different view still starts you at its top
 | **Scatter** | Two measures, with 2017→2022 movement arrows |
 | **Heatmap** | County × measure profile, z-scored per column |
 | **Concentration** | Lorenz curve + Gini — how much of Ohio sits in a few counties |
+| **County trends** | One measure per county across all five censuses, indexed or absolute |
 | **Ohio over time** | Indexed state series, 1997–2022, picked from a searchable list with sparklines |
 | **Discover** | See below |
 | **Table** | Every value, sortable — the accessible twin of every chart |
@@ -53,7 +72,8 @@ caret in a filter box. Switching to a different view still starts you at its top
 
 - **Measure picker** — search 2,325 measures by crop, animal, dollar figure or table,
   or open the **All measures** dictionary and browse them instead (see below)
-- **Year** — 2017 / 2022, or the change between them (absolute or %)
+- **Year** — whichever censuses the measure carries (two for the report, five for
+  Quick Stats), or the change between any two of them (absolute or %)
 - **How to count it** — raw · % of Ohio · per farm · per farm acre · per 1,000 acres
   of land · z-score · rank · **location quotient** (specialisation)
 - **Counties** — keep-only or leave-out, search, invert, Appalachian Ohio (ARC),
@@ -171,11 +191,31 @@ Notes:
 - Pages is HTTPS-only, which `DecompressionStream` requires anyway. Verified: all
   17 views render served over HTTP with **zero external network requests**.
 
+### Reliability: what is actually checked
+
+- **1,567 county figures** across 17 headline measures agree exactly with USDA's
+  machine-readable release. This is the strong claim — it catches the failure an
+  internal check cannot, like a column read one field to the left.
+- **652 additive measures** reconcile to the state totals the report publishes
+  separately. That covers ~17% of the parsed series; the rest are structurally
+  uncheckable that way (rare crops with no state total, suppressed cells,
+  averages that don't sum) — not known-wrong, just unverifiable by summation.
+- **Zero unparsed cells** across 247,086 county observations.
+- **`CV_%`** — USDA's coefficient of variation, shown in the tooltip for Quick
+  Stats measures. Published from 2012 onward only; 2002 and 2007 carry none.
+- Reliability tracks how dense the census itself is: Money, Land, Producers and
+  Operations are nearly all reported by 85–88 counties, while 246 of the 259
+  thinnest measures are rare crops reported by under 40, where a single farm
+  moves the ranking.
+
 ### Attribution and licence
 
 The data is the **USDA National Agricultural Statistics Service, 2022 Census of
 Agriculture** — a work of the US federal government and therefore in the public
 domain. Please keep the citation in the page footer if you republish it.
+
+The Quick Stats bulk files come from `nass.usda.gov/datasets` — no API key, and
+the front door for anyone wanting to do their own analysis.
 
 Bundled third-party code, both ISC-licensed: [D3](https://d3js.org) (v7) and the
 county geometry from [us-atlas](https://github.com/topojson/us-atlas), itself
@@ -184,11 +224,17 @@ derived from the US Census Bureau's cartographic boundary files.
 ## Rebuilding
 
 ```
-python3 parse_ohv1.py     # ohv1.txt      -> data/*.csv
-python3 build_payload.py  # data/*.csv    -> build/payload.json.gz
-python3 bundle.py         # everything    -> ohio_ag_explorer.html
-python3 test_app.py       # drives all 16 views in headless Chromium
+python3 fetch_quickstats.py    # NASS bulk files -> data/qs_ohio_county.tsv.gz
+python3 parse_ohv1.py          # ohv1.txt        -> data/*.csv
+python3 build_payload.py       # both sources    -> build/payload.json.gz
+python3 validate_quickstats.py # parser vs USDA  -> 1,567/1,567 or exit 1
+python3 bundle.py              # everything      -> ohio_ag_explorer.html
+python3 test_app.py            # drives all 19 views in headless Chromium
 ```
+
+`fetch_quickstats.py` streams five ~300 MB national files and keeps only the
+Ohio county rows (~90 s, 8 MB cached). That cache **is committed**, so a fresh
+clone builds with no network at all.
 
 `build/counties-10m.json` (county geometry) and `vendor/d3.min.js` were fetched
 once from jsDelivr and are committed so the build stays offline.

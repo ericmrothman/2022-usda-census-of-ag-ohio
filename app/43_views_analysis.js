@@ -60,7 +60,7 @@ function viewScatter(root) {
     text: `${b.label} →`}));
 
   if (arrows) {
-    const y0 = DB.metricById.get(STATE.metric).years[0];
+    const y0 = (deltaYears(STATE.metric) || [])[0];
     const a0 = series(STATE.metric, y0, STATE.mode).values;
     const b0 = series(STATE.metric2, y0, STATE.mode).values;
     const defs = s('defs');

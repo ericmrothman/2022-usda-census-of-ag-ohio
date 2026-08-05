@@ -8,8 +8,10 @@ const STATE = {
   metric2: null,         // secondary, used by scatter / bivariate / compare
   year: '2022',
   mode: 'raw',           // one of MODES
-  delta: false,          // draw 2017 → 2022 change instead of a level
+  delta: false,          // draw the change between two censuses, not a level
   deltaPct: true,
+  yearFrom: null,        // which two censuses the change spans; null = first
+  yearTo: null,          //   and last of whatever the measure carries
   // colour
   ramp: 'blue',
   diverging: false,

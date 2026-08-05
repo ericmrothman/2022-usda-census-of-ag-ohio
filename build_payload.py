@@ -121,6 +121,134 @@ def subject_of(title):
     return tidy(re.sub(r"\s*:\s*$", "", t))
 
 
+# ------------------------------------------------------- Quick Stats source
+
+QS_FILE = os.path.join(DATA, "qs_ohio_county.tsv.gz")
+QS_YEARS = ["2002", "2007", "2012", "2017", "2022"]
+QS_MIN_COUNTIES = 40      # a five-census trend needs a real base
+QS_CV_YEARS = {"2012", "2017", "2022"}   # earlier censuses publish no CV
+
+# Quick Stats' own sector names, mapped onto the topics already used for the
+# report so both sources browse the same way.
+QS_TOPIC = {
+    "CROPS": "Crops",
+    "ANIMALS & PRODUCTS": "Livestock",
+    "ECONOMICS": "Money",
+    "DEMOGRAPHICS": "Producers",
+    "ENVIRONMENTAL": "Operations",
+}
+
+
+def qs_domain_label(domain, domaincat):
+    """
+    'FARM SALES: (100,000 TO 249,999 $)' -> 'Farm sales: 100,000 to 249,999 $'.
+
+    DOMAINCAT_DESC already repeats the domain name, so the domain itself is
+    only used when the category is empty.
+    """
+    if not domaincat or domaincat == "NOT SPECIFIED":
+        return ""
+    text = domaincat.replace("(", "").replace(")", "")
+    return tidy(text)
+
+
+def load_quickstats(counties):
+    """
+    Ohio county series from USDA's machine-readable release.
+
+    Only series present in every census year are kept: a Quick Stats metric
+    exists here to carry a 20-year trend, and one that appears in a single
+    census does that no better than the parsed report already does.
+    """
+    if not os.path.exists(QS_FILE):
+        print(f"note: {QS_FILE} absent — run fetch_quickstats.py to add "
+              "the 2002-2022 series")
+        return [], {}, {}
+
+    idx = {c.upper(): i for i, c in enumerate(counties)}
+    n = len(counties)
+    series = defaultdict(lambda: {"vals": {}, "cv": {}, "meta": None})
+
+    with gzip.open(QS_FILE, "rt", encoding="utf-8", newline="") as fh:
+        for r in csv.DictReader(fh, delimiter="\t"):
+            i = idx.get(r["COUNTY_NAME"].strip().upper())
+            if i is None:
+                continue
+            key = (r["SHORT_DESC"], r["DOMAINCAT_DESC"])
+            year = r["YEAR"]
+            e = series[key]
+            if e["meta"] is None:
+                e["meta"] = r
+            e["vals"].setdefault(year, [None] * n)
+            e["cv"].setdefault(year, [None] * n)
+
+            raw = r["VALUE"].replace(",", "").strip()
+            if raw == "-":
+                e["vals"][year][i] = 0.0
+            else:
+                try:
+                    e["vals"][year][i] = float(raw)
+                except ValueError:
+                    pass          # (D) withheld, (Z), (NA): leave blank
+            cv = r.get("CV_%", "").strip()
+            try:
+                e["cv"][year][i] = round(float(cv), 1)
+            except ValueError:
+                pass
+
+    metrics, values, cvs = [], {}, {}
+    for (short, domaincat), e in series.items():
+        years = [y for y in QS_YEARS if y in e["vals"]
+                 and any(v is not None for v in e["vals"][y])]
+        if len(years) < len(QS_YEARS):
+            continue                       # not a full-span trend
+
+        m = e["meta"]
+        cov = max(sum(1 for v in e["vals"][y] if v is not None) for y in years)
+        # A higher bar than the report set: these exist to carry a 20-year
+        # trend, and a trend drawn from under half the counties -- with
+        # suppression moving between censuses -- is noise wearing a line.
+        if cov < QS_MIN_COUNTIES:
+            continue
+
+        mid = f"q{len(metrics)}"
+        dom = qs_domain_label(m["DOMAIN_DESC"], domaincat)
+        label = tidy(short)
+        if dom:
+            label = f"{label} · {dom}"
+        tree = [tidy(m[k]) for k in
+                ("SECTOR_DESC", "GROUP_DESC", "COMMODITY_DESC", "CLASS_DESC")]
+        tree = [t for t in tree if t and t.lower() != "all classes"]
+
+        cv_by_year = {y: e["cv"][y] for y in years
+                      if y in QS_CV_YEARS and any(v is not None for v in e["cv"][y])}
+
+        metrics.append({
+            "id": mid,
+            "source": "quickstats",
+            "label": label,
+            "official": short,
+            "context": " › ".join(tree[1:]) or tree[0] if tree else short,
+            "unit": tidy(m["UNIT_DESC"]),
+            "topic": QS_TOPIC.get(m["SECTOR_DESC"], "Other"),
+            "tree": tree,
+            "domain": dom,
+            "table": "Quick Stats",
+            "table_title": f"USDA Quick Stats · {tidy(m['SECTOR_DESC'])}",
+            "years": years,
+            "coverage": cov,
+            "suppressed": sum(1 for y in years
+                              for v in e["vals"][y] if v is None),
+            "hasCV": bool(cv_by_year),
+        })
+        values[mid] = {y: e["vals"][y] for y in years}
+        if cv_by_year:
+            cvs[mid] = cv_by_year
+
+    metrics.sort(key=lambda m: (m["topic"], m["label"]))
+    return metrics, values, cvs
+
+
 # ---------------------------------------------------------------- county maps
 
 def load_geo(counties):
@@ -277,6 +405,7 @@ def main():
             label = " · ".join(dedupe_parts([banner] + label.split(" · ")))
         metrics.append({
             "id": mid,
+            "source": "report",
             "label": label,
             "context": subject,
             "metric": metric, "section": section, "unit": unit,
@@ -345,9 +474,16 @@ def main():
     history = [{"label": k, "points": dict(sorted(v.items()))}
                for k, v in hist.items() if len(v) >= 4]
 
+    qs_metrics, qs_values, qs_cv = load_quickstats(counties)
+    metrics = metrics + qs_metrics
+    values.update(qs_values)
+
     payload = {
         "source": "USDA NASS, 2022 Census of Agriculture - Ohio, "
                   "Volume 1, Geographic Area Series, Part 35 (AC-22-A-35)",
+        "qsSource": "USDA NASS Quick Stats bulk files, 2002-2022 "
+                    "(nass.usda.gov/datasets)",
+        "cv": qs_cv,
         "counties": county_recs,
         "geo": geo,
         "metrics": metrics,

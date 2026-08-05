@@ -26,6 +26,7 @@ SOURCES = [
     "44_views_table.js",
     "45_views_stories.js",
     "46_views_browse.js",
+    "47_views_trend.js",
     "50_sidebar.js",
     "90_main.js",
 ]
