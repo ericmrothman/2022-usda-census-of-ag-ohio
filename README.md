@@ -44,7 +44,7 @@ every control triggers.
 | **Scatter** | Two measures, with 2017→2022 movement arrows |
 | **Heatmap** | County × measure profile, z-scored per column |
 | **Concentration** | Lorenz curve + Gini — how much of Ohio sits in a few counties |
-| **Ohio over time** | Indexed state series, 1997–2022 |
+| **Ohio over time** | Indexed state series, 1997–2022, picked from a searchable list with sparklines |
 | **Discover** | See below |
 | **Table** | Every value, sortable — the accessible twin of every chart |
 

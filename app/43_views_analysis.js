@@ -277,11 +277,18 @@ function viewHeatmap(root) {
 /* -------------------------------------------------------- Ohio time series */
 
 function viewHistory(root) {
-  const picks = STATE.historyPicks && STATE.historyPicks.length
-    ? STATE.historyPicks
-    : ['Farms (number)', 'Land in farms (acres)'];
+  // An empty array means "cleared"; undefined means "never touched", which is
+  // where the two opening series come from.
+  const picks = STATE.historyPicks == null ? HISTORY_DEFAULT : STATE.historyPicks;
   const chosen = DB.history.filter(hh => picks.includes(hh.label));
-  const list = chosen.length ? chosen : DB.history.slice(0, 2);
+  if (!chosen.length) {
+    root.append(h('div', {class: 'card'}, h('div', {class: 'empty'},
+      'No series selected.', h('br'),
+      h('span', {class: 'hint', text: 'Pick one or more below to plot them.'}))));
+    root.append(historyPicker());
+    return;
+  }
+  const list = chosen;
 
   const c = card('Ohio since 1997 — the long view',
     'The county tables only run 2017 and 2022. The state chapter of the same ' +
@@ -355,28 +362,138 @@ function viewHistory(root) {
   root.append(historyPicker());
 }
 
+const HISTORY_MAX = 8;
+const HISTORY_DEFAULT = ['Farms (number)', 'Land in farms (acres)'];
+
+/**
+ * Series picker for the Ohio time series.
+ *
+ * 113 series as a wall of truncated chips was unreadable — "Livestock and
+ * poultry · Cattle and calv…" appeared seven times with no way to tell the
+ * seven apart. So: full labels, grouped by the heading the census files them
+ * under, searchable, and each with a sparkline and its 1997→2022 change, so
+ * you can see the shape of a series before adding it.
+ */
 function historyPicker() {
+  const picks = new Set(STATE.historyPicks == null ? HISTORY_DEFAULT : STATE.historyPicks);
+  const chosen = DB.history.filter(hh => picks.has(hh.label));
+  const colors = categorical(Math.max(1, chosen.length));
+  const colorOf = label => {
+    const i = chosen.findIndex(hh => hh.label === label);
+    return i < 0 ? null : colors[i % colors.length];
+  };
+
+  const toggle = label => {
+    if (picks.has(label)) picks.delete(label);
+    else if (picks.size < HISTORY_MAX) picks.add(label);
+    else return toast(`Eight series is the limit — remove one first.`);
+    STATE.historyPicks = [...picks];
+    render();
+  };
+
   const box = h('div', {class: 'card'},
     h('h2', {text: 'Series to plot'}),
     h('p', {class: 'caption',
-      text: 'Up to eight at a time. These are Ohio-wide figures from the state ' +
-            'chapter of the report.'}));
-  const chips = h('div', {class: 'chips'});
-  const picks = new Set(STATE.historyPicks || ['Farms (number)', 'Land in farms (acres)']);
-  DB.history.forEach(hh => {
-    const on = picks.has(hh.label);
-    chips.append(h('button', {
-      class: 'chip', 'aria-pressed': String(on), text: truncate(hh.label, 40),
-      onclick: () => {
-        if (picks.has(hh.label)) picks.delete(hh.label);
-        else if (picks.size < 8) picks.add(hh.label);
-        STATE.historyPicks = [...picks];
-        render();
-      },
-    }));
-  });
-  box.append(chips);
+      text: `Ohio-wide figures from the state chapter of the report, ` +
+            `${DB.history.length} of them, 1997 to 2022. Up to ${HISTORY_MAX} at a time — ` +
+            `they share one indexed axis, so any mix is comparable.`}));
+
+  /* ---- what is currently plotted, in the chart's own colours ---- */
+  const sel = h('div', {class: 'hist-sel'});
+  if (!chosen.length) {
+    sel.append(h('span', {class: 'hint', text: 'Nothing selected — pick a series below.'}));
+  } else {
+    chosen.forEach(hh => {
+      sel.append(h('button', {class: 'hist-tag', title: 'Remove from the chart',
+        onclick: () => toggle(hh.label)},
+        h('span', {class: 'sw', style: {background: colorOf(hh.label)}}),
+        h('span', {text: hh.label}),
+        h('span', {class: 'x', text: '×'})));
+    });
+    sel.append(h('button', {class: 'btn sm', text: 'Clear all', onclick: () => {
+      STATE.historyPicks = []; render();
+    }}));
+  }
+  box.append(sel);
+
+  /* ---- the searchable list ---- */
+  const q = (STATE.historyQuery || '').trim().toLowerCase();
+  const search = h('input', {type: 'search', 'data-keep': 'historySearch',
+    value: STATE.historyQuery || '', style: {maxWidth: '380px', margin: '10px 0 4px'},
+    placeholder: 'Filter series — "hogs", "expenses", "wheat"…',
+    oninput: e => {
+      STATE.historyQuery = e.target.value;
+      const pos = e.target.selectionStart;
+      render();
+      requestAnimationFrame(() => {
+        const el = document.querySelector('[data-keep="historySearch"]');
+        if (el) { el.focus(); el.setSelectionRange(pos, pos); }
+      });
+    }});
+  box.append(search);
+
+  const groups = new Map();
+  for (const hh of DB.history) {
+    if (q && !hh.label.toLowerCase().includes(q)) continue;
+    const i = hh.label.indexOf(' · ');
+    const g = i > 0 ? hh.label.slice(0, i) : 'Headline figures';
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(hh);
+  }
+
+  const list = h('div', {class: 'hist-list'});
+  if (!groups.size) {
+    list.append(h('div', {class: 'hint', style: {padding: '12px'},
+      text: `Nothing matches “${q}”.`}));
+  }
+  for (const [g, items] of groups) {
+    list.append(h('div', {class: 'hist-group', text: g}));
+    for (const hh of items) {
+      const on = picks.has(hh.label);
+      const leaf = hh.label.startsWith(g + ' · ') ? hh.label.slice(g.length + 3) : hh.label;
+      const years = Object.keys(hh.points).sort();
+      const first = hh.points[years[0]], last = hh.points[years[years.length - 1]];
+      const pct = first ? (last - first) / Math.abs(first) * 100 : null;
+
+      list.append(h('label', {class: 'hist-row' + (on ? ' on' : '')},
+        h('input', {type: 'checkbox', checked: on,
+          disabled: !on && picks.size >= HISTORY_MAX,
+          onchange: () => toggle(hh.label)}),
+        h('span', {class: 'nm', text: leaf}),
+        sparkline(hh, on ? colorOf(hh.label) : null),
+        h('span', {class: 'chg',
+          style: {color: pct == null ? 'var(--text-muted)'
+            : pct >= 0 ? 'var(--good)' : 'var(--bad)'},
+          title: `${years[0]}: ${first.toLocaleString()} → ${years[years.length - 1]}: ${last.toLocaleString()}`,
+          text: pct == null ? '—' : `${pct >= 0 ? '+' : ''}${pct.toFixed(0)}%`})));
+    }
+  }
+  box.append(list);
+  box.append(h('p', {class: 'hint', style: {marginTop: '8px'},
+    text: `${picks.size} of ${HISTORY_MAX} selected. The sparkline shows each ` +
+          `series' own shape across the six censuses; the figure is its total change.`}));
   return box;
+}
+
+/** A 1997–2022 thumbnail, scaled to the series' own range. */
+function sparkline(hh, color) {
+  const W = 62, H = 16, pad = 1.5;
+  const years = Object.keys(hh.points).sort();
+  const vals = years.map(y => hh.points[y]);
+  const lo = Math.min(...vals), hi = Math.max(...vals);
+  const x = i => pad + (i / (years.length - 1)) * (W - pad * 2);
+  const y = v => hi === lo ? H / 2 : H - pad - ((v - lo) / (hi - lo)) * (H - pad * 2);
+  const svg = s('svg', {class: 'spark', width: W, height: H, viewBox: `0 0 ${W} ${H}`,
+    'aria-hidden': 'true'});
+  svg.append(s('path', {
+    d: 'M' + vals.map((v, i) => `${x(i)},${y(v)}`).join(' L'),
+    fill: 'none', stroke: color || cssVar('--axis'),
+    'stroke-width': color ? 1.8 : 1.3,
+    'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+  }));
+  svg.append(s('circle', {cx: x(vals.length - 1), cy: y(vals[vals.length - 1]),
+    r: 1.9, fill: color || cssVar('--axis')}));
+  return svg;
 }
 
 /* ---------------------------------------------------------------- discovery */

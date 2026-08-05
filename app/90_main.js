@@ -166,7 +166,7 @@ function partsToggle() {
 const HASH_KEYS = ['view', 'metric', 'metric2', 'year', 'mode', 'delta', 'deltaPct',
   'ramp', 'diverging', 'divKey', 'reverse', 'nClasses', 'breakMode', 'exclude',
   'showLabels', 'sortBy', 'topN', 'partsBy', 'focus', 'storyCounty',
-  'browseTopic', 'browseQuery'];
+  'browseTopic', 'browseQuery', 'historyQuery'];
 
 function writeHash() {
   const o = {};
