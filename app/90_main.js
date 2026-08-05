@@ -2,25 +2,66 @@
    Wiring: view registry, render loop, boot.
    ========================================================================== */
 
+/**
+ * Views, grouped by what they ask of you.
+ *
+ *   start   where to go when you don't yet know what you're looking for
+ *   single  one measure, drawn one way — swap the chart, keep the question
+ *   compare two or more things side by side
+ *
+ * Eighteen tabs in one scrolling row all read as equally likely. Split three
+ * ways with the groups named, the shelf explains itself.
+ */
+const VIEW_GROUPS = [
+  {id: 'start',   label: 'Start here',
+   hint: 'Ready-made findings, and the full list of what the census measures'},
+  {id: 'single',  label: 'One measure',
+   hint: 'The measure selected in the sidebar, drawn a different way'},
+  {id: 'compare', label: 'Compare',
+   hint: 'Two or more measures, or one measure against everything else'},
+];
+
 const VIEWS = [
-  {id: 'stories',   label: 'Key findings',  fn: viewStories},
-  {id: 'browse',    label: 'All measures',   fn: viewBrowse},
-  {id: 'map',       label: 'Map',            fn: viewMap},
-  {id: 'grid',      label: 'Tile grid',      fn: viewGrid},
-  {id: 'bivariate', label: 'Two at once',    fn: viewBivariate},
-  {id: 'rank',      label: 'Ranked bars',    fn: viewRank},
-  {id: 'change',    label: 'Change',         fn: viewChange},
-  {id: 'small',     label: 'Small multiples', fn: viewSmallMultiples},
-  {id: 'treemap',   label: 'Treemap',        fn: viewTreemap},
-  {id: 'waffle',    label: 'Waffle',         fn: viewWaffle},
-  {id: 'donut',     label: 'Donut',          fn: viewDonut},
-  {id: 'dist',      label: 'Distribution',   fn: viewDistribution},
-  {id: 'scatter',   label: 'Scatter',        fn: viewScatter},
-  {id: 'heatmap',   label: 'Heatmap',        fn: viewHeatmap},
-  {id: 'conc',      label: 'Concentration',  fn: viewConcentration},
-  {id: 'history',   label: 'Ohio over time', fn: viewHistory},
-  {id: 'discover',  label: 'Discover',       fn: viewDiscover},
-  {id: 'table',     label: 'Table',          fn: viewTable},
+  {g: 'start', id: 'stories', label: 'Key findings', fn: viewStories,
+   tip: 'Ready-made findings for any county, each opening the view that proves it'},
+  {g: 'start', id: 'browse', label: 'All measures', fn: viewBrowse,
+   tip: 'Browse all 2,325 measures by topic and census table'},
+
+  {g: 'single', id: 'map', label: 'Map', fn: viewMap,
+   tip: 'Choropleth of the 88 counties, equal-area projection'},
+  {g: 'single', id: 'grid', label: 'Tile grid', fn: viewGrid,
+   tip: 'Every county the same size, so small ones stay visible'},
+  {g: 'single', id: 'rank', label: 'Ranked bars', fn: viewRank,
+   tip: 'Counties sorted by value — the most precise comparison'},
+  {g: 'single', id: 'change', label: 'Change', fn: viewChange,
+   tip: '2017 to 2022 for each county, sorted by how far it moved'},
+  {g: 'single', id: 'dist', label: 'Distribution', fn: viewDistribution,
+   tip: 'How the 88 counties are spread across the range'},
+  {g: 'single', id: 'treemap', label: 'Treemap', fn: viewTreemap,
+   tip: 'Share of the total, as nested rectangles'},
+  {g: 'single', id: 'waffle', label: 'Waffle', fn: viewWaffle,
+   tip: 'Share of the total, as 500 countable squares'},
+  {g: 'single', id: 'donut', label: 'Donut', fn: viewDonut,
+   tip: 'Share of the total, for a handful of parts'},
+  {g: 'single', id: 'conc', label: 'Concentration', fn: viewConcentration,
+   tip: 'How much of Ohio’s total sits in how few counties (Lorenz curve, Gini)'},
+  {g: 'single', id: 'table', label: 'Table', fn: viewTable,
+   tip: 'Every value, sortable — the plain-text twin of every chart'},
+
+  {g: 'compare', id: 'bivariate', label: 'Two at once', fn: viewBivariate,
+   tip: 'Two measures on one map, shaded by where a county falls on both',
+   needs2: true},
+  {g: 'compare', id: 'scatter', label: 'Scatter', fn: viewScatter,
+   tip: 'One measure against another, with 2017→2022 movement arrows',
+   needs2: true},
+  {g: 'compare', id: 'small', label: 'Small multiples', fn: viewSmallMultiples,
+   tip: 'One mini-map per measure in the same breakdown group'},
+  {g: 'compare', id: 'heatmap', label: 'Heatmap', fn: viewHeatmap,
+   tip: 'Every county against every measure in the group, standardised'},
+  {g: 'compare', id: 'history', label: 'Ohio over time', fn: viewHistory,
+   tip: 'Several statewide series, 1997–2022, indexed to a common base'},
+  {g: 'compare', id: 'discover', label: 'Discover', fn: viewDiscover,
+   tip: 'What else looks like this measure, and which counties are alike'},
 ];
 
 /** Some views describe measures rather than counties; they choose their own split. */
@@ -68,22 +109,34 @@ function sourceFooter() {
 
 function paintViewbar() {
   const bar = clear($('#viewbar'));
-  for (const v of VIEWS) {
-    const btn = h('button', {
-      role: 'tab', 'aria-selected': String(v.id === STATE.view), text: v.label,
-      onclick: () => {
-        if (v.id === 'stories') markSeen('stories');
-        STATE.view = v.id;
-        render();
-      },
-    });
-    // Key findings is the best way in but the least obvious tab, so it gets a
-    // dot until it has been opened once.
-    if (v.id === 'stories' && !SEEN.stories && STATE.view !== 'stories') {
-      btn.append(h('span', {class: 'nudge', 'aria-hidden': 'true'}));
-      btn.setAttribute('title', 'Start here — ready-made findings for any county');
+  for (const grp of VIEW_GROUPS) {
+    const row = h('div', {class: 'viewrow', role: 'tablist', 'aria-label': grp.label});
+    row.append(h('span', {class: 'rowlab', title: grp.hint, text: grp.label}));
+
+    for (const v of VIEWS.filter(x => x.g === grp.id)) {
+      const btn = h('button', {
+        role: 'tab', 'aria-selected': String(v.id === STATE.view),
+        title: v.tip, text: v.label,
+        onclick: () => {
+          if (v.id === 'stories') markSeen('stories');
+          STATE.view = v.id;
+          render();
+        },
+      });
+      // Views needing a second measure say so before you click, rather than
+      // greeting you with an empty state.
+      if (v.needs2 && !STATE.metric2) {
+        btn.classList.add('wants');
+        btn.setAttribute('title', `${v.tip} — needs a second measure; pick one in the sidebar`);
+      }
+      // Key findings is the best way in but the least obvious tab, so it keeps
+      // a dot until it has been opened once.
+      if (v.id === 'stories' && !SEEN.stories && STATE.view !== 'stories') {
+        btn.append(h('span', {class: 'nudge', 'aria-hidden': 'true'}));
+      }
+      row.append(btn);
     }
-    bar.append(btn);
+    bar.append(row);
   }
 }
 
