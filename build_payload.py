@@ -152,6 +152,178 @@ def qs_domain_label(domain, domaincat):
     return tidy(text)
 
 
+MATCH_MIN_OVERLAP = 20    # counties both sources report
+MATCH_MIN_DISTINCT = 5    # distinct values among them
+
+
+def merge_quickstats(metrics, values, qs_metrics, qs_values, qs_cv):
+    """
+    Fold each Quick Stats series into the report metric it duplicates.
+
+    96% of the Quick Stats series are a measure the report already carries --
+    same figures, different name. Listing both doubled the catalogue without
+    adding anything to explore. What Quick Stats genuinely adds is *years*
+    (2002-2012) and USDA's CV, so those get attached to the existing metric and
+    the duplicate entry is dropped.
+
+    Two series are judged the same measure when every county value they both
+    report is equal, in every census year they share. That is agreement on the
+    data itself, which is why this is safe where matching 2,325 reconstructed
+    labels against 1,470 official ones would not have been.
+    """
+    def vec(store, mid, year, scale=1):
+        v = store.get(mid, {}).get(year)
+        if not v:
+            return None
+        return [None if x is None else round(x * scale, 3) for x in v]
+
+    # Index report metrics by their first non-null value so each Quick Stats
+    # series compares against a handful of candidates, not all 2,325.
+    probe = defaultdict(set)
+    for m in metrics:
+        for y in ("2022", "2017"):
+            for sc in (1, 1000):
+                v = vec(values, m["id"], y, sc)
+                if not v:
+                    continue
+                for x in v:
+                    if x is not None and x > 0:
+                        probe[x].add(m["id"])
+                        break
+
+    by_id = {m["id"]: m for m in metrics}
+
+    def agreement(qid, rid):
+        """Scale factor and distinct-value count if they agree, else None."""
+        shared = [y for y in ("2017", "2022")
+                  if qs_values.get(qid, {}).get(y) and values.get(rid, {}).get(y)]
+        if not shared:
+            return None
+        for sc in (1, 1000):
+            ok, total, distinct = True, 0, set()
+            for y in shared:
+                a, b = vec(qs_values, qid, y), vec(values, rid, y, sc)
+                both = [(x, z) for x, z in zip(a, b)
+                        if x is not None and z is not None]
+                if len(both) < MATCH_MIN_OVERLAP:
+                    ok = False
+                    break
+                total += len(both)
+                distinct |= {x for x, _ in both}
+                if any(x != z for x, z in both):
+                    ok = False
+                    break
+            if ok and total >= MATCH_MIN_OVERLAP:
+                return sc, len(distinct)
+        return None
+
+    # --- pass one: find every (quickstats, report) pair that agrees
+    pairs = defaultdict(list)      # report id -> [(distinct, years, scale, qs metric)]
+    kept, weak, matched, cv_out = [], [], set(), {}
+    for qm in qs_metrics:
+        qid = qm["id"]
+        cands = set()
+        for y in ("2022", "2017"):
+            v = vec(qs_values, qid, y)
+            if not v:
+                continue
+            for x in v:
+                if x is not None and x > 0:
+                    cands |= probe.get(x, set())
+                    break
+
+        hits, thin = [], []
+        for rid in cands:
+            got = agreement(qid, rid)
+            if not got:
+                continue
+            (hits if got[1] >= MATCH_MIN_DISTINCT else thin).append((rid, got[0], got[1]))
+
+        # Equal values only evidence being the same measure when there are
+        # enough different values to make the coincidence unlikely. Sorghum
+        # silage is 24 counties reading 1, 2, 3 or 5 -- that matches a farm
+        # count and a tonnage equally well, so it matches neither.
+        if thin and not hits:
+            weak.append((qm["label"], by_id[thin[0][0]]["label"], thin[0][2]))
+        if not hits:
+            kept.append(qm)
+            continue
+
+        matched.add(qid)
+        for rid, scale, distinct in hits:
+            pairs[rid].append((distinct, len(qm["years"]), scale, qm))
+
+    # --- pass two: fill each report metric from exactly one series
+    #
+    # Several Quick Stats series can legitimately agree with the same report
+    # metric on the overlap and still differ in the earlier censuses. Letting each
+    # write in turn meant the last one won, silently, and put 2002 figures in
+    # that disagreed with Quick Stats itself. Pick the best-evidenced match --
+    # most distinct values, then the longest series -- and use only that one.
+    ambiguous = 0
+    for rid, cands in pairs.items():
+        distinct, _, scale, qm = max(cands, key=lambda t: (t[0], t[1]))
+        r = by_id[rid]
+        # Fill only what the printed table lacks. Where the report publishes a
+        # year it is kept, because those are the figures checked against the
+        # PDFs; where it doesn't -- Table 24 is 2022-only -- Quick Stats
+        # completes the series.
+        extra = [y for y in qm["years"] if y not in r["years"]]
+        if not extra:
+            continue
+
+        # Agreeing on 2017 and 2022 does not make two series the same measure.
+        # Every farm has sales in a census year, so "operations with sales" and
+        # "number of operations" match exactly on the overlap and then diverge
+        # in 2002. When the candidates disagree about the years being filled,
+        # nothing here can say which is right -- so fill neither.
+        def fill_from(cand):
+            _, _, sc, cqm = cand
+            return {y: tuple(None if x is None else round(x / sc, 6)
+                             for x in qs_values[cqm["id"]][y])
+                    for y in extra if y in qs_values[cqm["id"]]}
+        proposals = {tuple(sorted(fill_from(c).items())) for c in cands}
+        if len(proposals) > 1:
+            ambiguous += 1
+            continue
+        # Into the report's units, not Quick Stats': the census prints money in
+        # thousands and Quick Stats in dollars, so copying verbatim would leave
+        # 2002-2012 a thousand times larger than 2017 in the same series.
+        # `scale` is the factor agreement() already proved.
+        for y in extra:
+            values[rid][y] = [None if x is None else x / scale
+                              for x in qs_values[qm["id"]][y]]
+        r["years"] = sorted(set(r["years"]) | set(extra))
+        r["official"] = qm.get("official")
+        r["qsYears"] = extra
+        if qs_cv.get(qm["id"]):
+            cv_out[rid] = qs_cv[qm["id"]]
+            r["hasCV"] = True
+        r["suppressed"] = sum(1 for y in r["years"]
+                              for v in values[rid][y] if v is None)
+        r["coverage"] = max(sum(1 for v in values[rid][y] if v is not None)
+                            for y in r["years"])
+    merged = len(matched)
+    if ambiguous:
+        print(f"  {ambiguous} measure(s) left at 2017/2022 only: two or more "
+              f"Quick Stats series matched the overlap but disagreed on the "
+              f"earlier censuses")
+
+    # The genuine additions keep their own values and CV.
+    for qm in kept:
+        values[qm["id"]] = qs_values[qm["id"]]
+        if qs_cv.get(qm["id"]):
+            cv_out[qm["id"]] = qs_cv[qm["id"]]
+
+    if weak:
+        print(f"  {len(weak)} series left unmerged: their only candidate matched "
+              f"on fewer than {MATCH_MIN_DISTINCT} distinct values")
+        for a, b, d in weak[:5]:
+            print(f"    {d} distinct — {a[:42]} ~ {b[:42]}")
+
+    return merged, kept, cv_out
+
+
 def load_quickstats(counties):
     """
     Ohio county series from USDA's machine-readable release.
@@ -388,13 +560,21 @@ def main():
         if cov < MIN_COUNTIES:
             continue
         mid = f"m{len(metrics)}"
-        years = sorted(y for y in byyear if y)
         vals, oh = {}, {}
-        for y in years:
+        for y in sorted(y for y in byyear if y):
             g = byyear[y]
-            vals[y] = [g.get(c) for c in counties]
+            col = [g.get(c) for c in counties]
+            # A year with a state total but no county figures is not a year this
+            # measure has: the livestock tables print 2017 for Ohio only, and
+            # offering it in the year picker just yields an empty map.
+            if not any(v is not None for v in col):
+                continue
+            vals[y] = col
             if g.get("Ohio") is not None:
                 oh[y] = g["Ohio"]
+        years = sorted(vals)
+        if not years:
+            continue
 
         subject = subject_of(title)
         label = short_label(section, metric, unit)
@@ -475,8 +655,15 @@ def main():
                for k, v in hist.items() if len(v) >= 4]
 
     qs_metrics, qs_values, qs_cv = load_quickstats(counties)
-    metrics = metrics + qs_metrics
-    values.update(qs_values)
+    n_merged, qs_kept, qs_cv = merge_quickstats(
+        metrics, values, qs_metrics, qs_values, qs_cv)
+    metrics = metrics + qs_kept
+    metrics.sort(key=lambda m: (m["topic"], m.get("table_title", ""), m["label"]))
+    if qs_metrics:
+        deep = sum(1 for m in metrics if len(m["years"]) > 2)
+        print(f"quickstats: {n_merged} of {len(qs_metrics)} series folded into "
+              f"an existing measure, {len(qs_kept)} kept as new")
+        print(f"            {deep} measures now carry 3+ censuses")
 
     payload = {
         "source": "USDA NASS, 2022 Census of Agriculture - Ohio, "

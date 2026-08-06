@@ -80,12 +80,26 @@ function cvNote(cv) {
 
 const isQuickStats = m => (m && m.source) === 'quickstats';
 
-/** Where a figure came from, for provenance lines. */
+/** A measure whose earlier censuses were filled in from Quick Stats. */
+const hasQsYears = m => !!(m && m.qsYears && m.qsYears.length);
+
+/**
+ * Where a figure came from.
+ *
+ * Most measures are now two-sourced: the report supplies 2017 and 2022 — the
+ * years checked against the published tables — and Quick Stats supplies the
+ * earlier censuses. Saying only one of those would be untrue for 950 measures.
+ */
 function sourceLabel(m) {
   if (!m) return '';
-  return isQuickStats(m)
-    ? `USDA Quick Stats · ${m.years[0]}–${m.years[m.years.length - 1]}`
-    : `${m.table}, county chapter`;
+  if (isQuickStats(m))
+    return `USDA Quick Stats · ${m.years[0]}–${m.years[m.years.length - 1]}`;
+  if (hasQsYears(m)) {
+    const own = m.years.filter(y => !m.qsYears.includes(y));
+    return `${m.table}, county chapter (${own.join(' & ')}) · ` +
+           `USDA Quick Stats (${m.qsYears.join(', ')})`;
+  }
+  return `${m.table}, county chapter`;
 }
 
 /** Years a metric actually carries, newest last. */

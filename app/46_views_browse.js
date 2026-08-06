@@ -26,11 +26,11 @@ const TOPIC_BLURB = {
  * it was printed in, Quick Stats by what the thing is — so forcing one tree on
  * both would misrepresent whichever lost.
  */
-function browseTree(sourceFilter) {
+function browseTree(deepOnly) {
   const topics = new Map();
   for (const m of DB.metrics) {
     const src = m.source || 'report';
-    if (sourceFilter && src !== sourceFilter) continue;
+    if (deepOnly && m.years.length < 3) continue;
     if (!topics.has(m.topic)) topics.set(m.topic, new Map());
     const tables = topics.get(m.topic);
 
@@ -64,6 +64,9 @@ function tidySection(section) {
     .join(' › ');
 }
 
+/** Measures carrying three or more censuses — what the trend view can draw. */
+const DEEP_COUNT = () => DB.metrics.filter(m => m.years.length >= 3).length;
+
 const TOPIC_ORDER = ['Overview', 'Money', 'Land', 'Livestock', 'Crops',
                      'Operations', 'Producers'];
 
@@ -76,7 +79,7 @@ function matchesQuery(m, terms) {
 function viewBrowse(root) {
   const q = (STATE.browseQuery || '').trim().toLowerCase();
   const terms = q.split(/\s+/).filter(Boolean);
-  const tree = browseTree(STATE.browseSource || null);
+  const tree = browseTree(STATE.browseDeep || false);
 
   /* ---- header: what this is, plus search and a way in for the undecided --- */
 
@@ -97,20 +100,19 @@ function viewBrowse(root) {
   const head = h('div', {class: 'card'},
     h('h2', {text: 'Measure dictionary'}),
     h('p', {class: 'caption'},
-      `${DB.metrics.length.toLocaleString()} measures from two sources: the printed ` +
-      `county tables (2017 and 2022, shelved by the table they appear in) and USDA's ` +
-      `Quick Stats release (2002–2022, shelved by commodity). Open a group to see what ` +
-      `is in it; clicking a measure selects it and takes you to the map.`),
+      `Every one of the ${DB.metrics.length.toLocaleString()} measures, laid out the ` +
+      `way the census organises them — 57 county tables, each broken into sections. ` +
+      `${DEEP_COUNT().toLocaleString()} of them carry all five censuses back to 2002. ` +
+      `Open a group to see what is in it; clicking a measure selects it and takes ` +
+      `you to the map.`),
     h('div', {class: 'row'}, search,
       segmented([
-        {id: '', label: 'Both sources'},
-        {id: 'report', label: 'Printed report · 2017 & 2022',
-         desc: 'Parsed from the county tables, in the order they are printed — ' +
-               'the structure that matches the published PDFs.'},
-        {id: 'quickstats', label: 'Quick Stats · 2002–2022',
-         desc: "USDA's machine-readable release: official variable names, all " +
-               'five censuses, and a published reliability figure.'},
-      ], STATE.browseSource || '', v => { STATE.browseSource = v || null; render(); }),
+        {id: '', label: 'All measures'},
+        {id: 'deep', label: `20-year trend (${DEEP_COUNT()})`,
+         desc: 'Measures carrying all five censuses, 2002 to 2022 — the ones the ' +
+               'County trends view can draw. The rest have 2017 and 2022 only.'},
+      ], STATE.browseDeep ? 'deep' : '',
+        v => { STATE.browseDeep = v === 'deep'; render(); }),
       h('button', {class: 'btn', text: 'Surprise me', title:
         'Jump to a randomly chosen measure with good county coverage',
         onclick: () => {
@@ -231,6 +233,10 @@ function measureRow(m) {
     h('span', {class: 'meta'},
       h('span', {text: m.years.length > 2
         ? `${m.years[0]}–${m.years[m.years.length - 1]}` : m.years.join(' & ')}),
+      m.years.length >= 3 ? h('span', {text: '·'}) : null,
+      m.years.length >= 3 ? h('span', {style: {color: 'var(--accent)'},
+        title: 'Carries all five censuses — can be drawn on the County trends view',
+        text: 'trend'}) : null,
       m.hasCV ? h('span', {text: '·'}) : null,
       m.hasCV ? h('span', {title:
         'USDA publishes a coefficient of variation for this measure, so the ' +

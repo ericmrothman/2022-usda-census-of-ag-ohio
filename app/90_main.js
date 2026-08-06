@@ -202,7 +202,7 @@ const HASH_KEYS = ['view', 'metric', 'metric2', 'year', 'mode', 'delta', 'deltaP
   'ramp', 'diverging', 'divKey', 'reverse', 'nClasses', 'breakMode', 'exclude',
   'showLabels', 'sortBy', 'topN', 'partsBy', 'focus', 'storyCounty',
   'browseTopic', 'browseQuery', 'historyQuery', 'yearFrom', 'yearTo',
-  'browseSource', 'trendMode'];
+  'browseDeep', 'trendMode'];
 
 function writeHash() {
   const o = {};

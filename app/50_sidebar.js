@@ -403,8 +403,12 @@ function groupAbout() {
             `${(DB.cv[m.id] ? Object.keys(DB.cv[m.id]).sort() : []).join(', ')} — ` +
             `hover a county to see it. The 2002 and 2007 censuses were released ` +
             `without one, and not every measure carries it in every later year.`}) : null,
+    m && hasQsYears(m) ? h('p', {class: 'hint',
+      text: `The ${m.qsYears.join(', ')} figures come from USDA's Quick Stats ` +
+            `release; ${m.years.filter(y => !m.qsYears.includes(y)).join(' and ')} ` +
+            `come from the printed table and are the ones cross-checked against it.`}) : null,
     m && isQuickStats(m) ? h('p', {class: 'hint',
-      text: 'Taken from the Quick Stats bulk release rather than the printed ' +
+      text: 'Published in the Quick Stats release but not in the printed county ' +
             'tables, so it carries all five censuses and USDA’s own variable name.'}) : null,
     h('p', {class: 'hint', text: DB.source}),
     h('p', {class: 'hint',

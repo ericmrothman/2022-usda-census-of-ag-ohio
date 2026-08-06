@@ -11,29 +11,43 @@ server, no network, no install. It works from a USB stick.
 
 ## What's in it
 
-**3,137 measures × 88 counties**, from two sources, plus a 1997–2022 state series.
+**2,355 measures × 88 counties**, plus a 1997–2022 state series.
 Everything the report publishes at county level: farm counts and acreage, sales
 by commodity, production expenses, government payments, livestock inventories,
 every crop from corn to Marionberries, machinery, organic acreage, and producer
 demographics.
 
-### Two data sources
+### One catalogue, two sources
 
-| | |
-|---|---|
-| **Printed report** | 2,325 measures parsed from `ohv1.txt`, the Ohio county volume — 2017 and 2022, shelved by the table they appear in, so it lines up with the published PDFs |
-| **Quick Stats** | 812 measures from USDA's machine-readable bulk release — **all five censuses, 2002–2022**, official variable names, and USDA's own `CV_%` reliability figure |
+2,325 measures are parsed from `ohv1.txt`, the printed Ohio county volume —
+2017 and 2022, shelved by the table they appear in, so the tool lines up with
+the published PDFs.
 
-They sit side by side rather than merged: matching 2,325 reconstructed labels
-against 1,470 official ones would be the likeliest place to introduce a silent
-error. Every measure says which source it came from, and the dictionary filters
-by it.
+USDA also releases the whole census as machine-readable Quick Stats bulk files.
+**96% of what's in those files is a measure the report already carries** — same
+county figures, different name — so listing them separately just doubled the
+catalogue. Instead each Quick Stats series is *folded into* the measure it
+duplicates, which gains the earlier censuses:
+
+- **939 measures now carry three or more censuses**, most of them all five back
+  to 2002 — filterable in the dictionary as "20-year trend"
+- **30 measures** exist only in Quick Stats (llamas, pigeons, machinery age
+  bands) and stay as their own entries
+- Every measure says which years came from which source, e.g.
+  *"Table 24, county chapter (2022) · USDA Quick Stats (2002, 2007, 2012, 2017)"*
+
+**Series are matched by their data, not their labels.** Two series are the same
+measure only when every county value they both report is equal, in every year
+they share, over at least 20 counties and 5 distinct values. Where two Quick
+Stats series match the same measure but disagree about the earlier censuses —
+"operations with sales" and "number of operations" are identical in a census
+year and diverge in 2002 — neither is used, and the measure keeps 2017/2022
+only. 11 measures fall in that bucket.
 
 **The parser is validated against Quick Stats.** `validate_quickstats.py` maps 17
 headline measures to their official `SHORT_DESC` equivalents and compares every
-county value: **1,567 figures, 100% agreement, zero differences.** It exits
-non-zero on any mismatch, so a parser regression fails the build rather than
-quietly shipping.
+county value in every year: **7,068 figures, 100% agreement, zero differences.**
+It exits non-zero on any mismatch, so a regression fails the build.
 
 ### 19 views, in three shelves
 
@@ -193,7 +207,8 @@ Notes:
 
 ### Reliability: what is actually checked
 
-- **1,567 county figures** across 17 headline measures agree exactly with USDA's
+- **7,068 county figures** across 17 headline measures and five censuses agree
+  exactly with USDA's
   machine-readable release. This is the strong claim — it catches the failure an
   internal check cannot, like a column read one field to the left.
 - **652 additive measures** reconcile to the state totals the report publishes
@@ -227,7 +242,7 @@ derived from the US Census Bureau's cartographic boundary files.
 python3 fetch_quickstats.py    # NASS bulk files -> data/qs_ohio_county.tsv.gz
 python3 parse_ohv1.py          # ohv1.txt        -> data/*.csv
 python3 build_payload.py       # both sources    -> build/payload.json.gz
-python3 validate_quickstats.py # parser vs USDA  -> 1,567/1,567 or exit 1
+python3 validate_quickstats.py # parser vs USDA  -> 7,068/7,068 or exit 1
 python3 bundle.py              # everything      -> ohio_ag_explorer.html
 python3 test_app.py            # drives all 19 views in headless Chromium
 ```

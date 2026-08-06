@@ -15,13 +15,13 @@ function viewTrend(root) {
       m ? `“${truncate(m.label, 60)}” covers ${m.years.join(' and ')} only.` : 'No measure selected.',
       h('br'),
       h('span', {class: 'hint', text:
-        'A trend needs three or more censuses. The measures drawn from USDA ' +
-        'Quick Stats carry all five (2002–2022) — open All measures and filter ' +
-        'to that source, or use the button below.'}),
+        'A trend needs three or more censuses. Around 950 measures carry all ' +
+        'five (2002–2022) — open All measures and filter to "20-year trend", ' +
+        'or use the button below.'}),
       h('br'), h('br'),
       h('button', {class: 'btn primary', text: 'Show me the five-census measures',
         onclick: () => {
-          STATE.view = 'browse'; STATE.browseSource = 'quickstats'; render();
+          STATE.view = 'browse'; STATE.browseDeep = true; render();
         }}))));
     return;
   }
